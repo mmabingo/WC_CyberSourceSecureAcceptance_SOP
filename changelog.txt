@@ -1,0 +1,11 @@
+*** CyberSource Secure Acceptance Silent Order Post Gateway Changelog ***
+
+2015.05.14 - version 1.1.1
+ * Added a feature for Update Notifications for new plug-in releases
+
+2015.05.04 - version 1.1.0
+ * Removed Deprecated functions
+ * Removed the submit to self form a work around to generate the HASH_MAC/Signature value
+
+2014.03.14 - version 1.0.0
+ * First CyberSource Secure Acceptance Silent Order Post Release
