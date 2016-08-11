@@ -60,7 +60,7 @@ class WC_Cybersource_Secure_Acceptance_SOP
 	 * The custom receipt page to redirect to after a transaction.
 	 * This is not guaranteed to work, so it's important to configure the setting
 	 * in the CyberSource Admin-> Tools & Settings -> Profiles -> Profile Name -> Customer Response Pages
-	 * Receipt Page with https://hostname/?wc-api=wc_gateway_cybersource_secure_acceptance_sop_response
+	 * Receipt Page with https://www.example.com/?wc-api=wc_gateway_cybersource_secure_acceptance_sop_response
 	 * @var string
 	 */
 	private $response_url;
