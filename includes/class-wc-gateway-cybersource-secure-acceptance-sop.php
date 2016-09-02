@@ -27,23 +27,14 @@ class WC_Gateway_Cybersource_Secure_Acceptance_SOP extends WC_Payment_Gateway {
 
 	// CyberSource Standard Transaction Endpoints
 	private $test_url = "https://testsecureacceptance.cybersource.com/silent/pay";
+	//private $test_url = "http://localhost/php_sop/receipt.php";
 	private $live_url = "https://secureacceptance.cybersource.com/silent/pay";
 
-	private $test_environment = "TEST";
-	private $live_environment = "PRODUCTION";
-	private $testmode;
-	private $debug;
-	private $log;
-	private $device_finger_print;
-	private $transaction_type;
-	private $locale;
-	private $currency;
-	private $card_type;
-	private $profile_id;
-	private $secret_key;
-	private $access_key;
-	private $sslseal;
-	private $banklogo;
+
+	// CyberSource Decision Manager Device Fingerprinting Organisation IDs
+	private $test_org_id = "1snn5n9w";
+	private $live_org_id = "k8vif92e";
+
 
 	/**
 	 * Associative array of card types to card name
@@ -82,12 +73,11 @@ class WC_Gateway_Cybersource_Secure_Acceptance_SOP extends WC_Payment_Gateway {
 
 		// define the default card type options, and allow plugins to add in additional ones.
 		// Additional display names can be associated with a single card type by using the
-		// following convention: 001: Visa, 002: MasterCard, etc
+		// following convention: 001: Visa, 002: MasterCard, 003: American Express, etc
 		$default_card_type_options = array(
 			'001' => 'Visa',
 			'002' => 'MasterCard',
 			'003' => 'American Express',
-			'033' => 'Visa Electron',
 			'042' => 'Maestro Int\'l'
 		);
 		$this->card_type_options = apply_filters( 'woocommerce_cybersource_secure_acceptance_sop_card_types', $default_card_type_options );
@@ -99,31 +89,38 @@ class WC_Gateway_Cybersource_Secure_Acceptance_SOP extends WC_Payment_Gateway {
 		$this->init_settings();
 
 		// Define user set variables
-		$this->enabled          = $this->settings['enabled'];
-		$this->title            = $this->settings['title'];
-		$this->description      = $this->settings['description'];
-		$this->checkout_processing	= $this->settings['checkout_processing'];
-		$this->testmode         = $this->settings['testmode'];
-		$this->debug            = $this->settings['debug'];
-		$this->log              = $this->settings['log'];
-		$this->device_finger_print	= $this->settings['device_finger_print'];
-		$this->transaction_type	= $this->settings['transaction_type'];
-		$this->locale			= $this->settings['locale'];
-		$this->currency			= $this->settings['currency'];
-		$this->card_type        = $this->settings['card_type'];
-		$this->profile_id       = $this->settings['profile_id'];
-		$this->profile_id_test  = $this->settings['profile_id_test'];
-		$this->secret_key	    = $this->settings['secret_key'];
-		$this->secret_key_test  = $this->settings['secret_key_test'];
-		$this->access_key	    = $this->settings['access_key'];
-		$this->access_key_test  = $this->settings['access_key_test'];
-		$this->sslseal          = isset( $this->settings['sslseal'] ) ? $this->settings['sslseal'] : 'no';
-		$this->banklogo         = isset( $this->settings['banklogo'] ) ? $this->settings['banklogo'] : 'no';
+		$this->enabled          		= $this->settings['enabled'];
+		$this->title            		= $this->settings['title'];
+		$this->description      		= $this->settings['description'];
+		$this->checkout_processing		= $this->settings['checkout_processing'];
+		$this->testmode         		= $this->settings['testmode'];
+		$this->debug            		= $this->settings['debug'];
+		$this->log              		= $this->settings['log'];
+		$this->device_finger_print		= $this->settings['device_finger_print'];
+		$this->transaction_type			= $this->settings['transaction_type'];
+		$this->locale					= $this->settings['locale'];
+		$this->currency					= $this->settings['currency'];
+		$this->card_type        		= $this->settings['card_type'];
+		$this->merchant_id				= $this->settings['merchant_id'];
+		$this->profile_keys				= $this->settings['profile_keys'];
+		$this->profile_id       		= $this->settings['profile_id'];
+		$this->profile_id_test  		= $this->settings['profile_id_test'];
+		$this->secret_key	    		= $this->settings['secret_key'];
+		$this->secret_key_test  		= $this->settings['secret_key_test'];
+		$this->access_key	    		= $this->settings['access_key'];
+		$this->access_key_test  		= $this->settings['access_key_test'];
+		$this->autocomplete_orders  	= $this->settings['autocomplete_orders'];
+		$this->autocomplete_orders_mode = $this->settings['autocomplete_orders_mode'];
+		$this->sslseal          		= isset( $this->settings['sslseal'] ) ? $this->settings['sslseal'] : 'no';
+		$this->banklogo         		= isset( $this->settings['banklogo'] ) ? $this->settings['banklogo'] : 'no';
 
 		if ( $this->is_test_mode() ) $this->description . ' ' . __( 'TEST MODE ENABLED', WC_Cybersource_Secure_Acceptance_SOP::TEXT_DOMAIN );
 
 		// Payment form hook
 		add_action( 'woocommerce_receipt_' . $this->id, array( $this, 'payment_page' ) );
+		
+		// Autocomplete Orders hook
+		add_action( 'init', array( $this,'autocompleteOrders' ), 0 );
 
 		if ( is_admin() )
 		{
@@ -248,7 +245,7 @@ class WC_Gateway_Cybersource_Secure_Acceptance_SOP extends WC_Payment_Gateway {
 		}
 
 		// Array for Order and to be used for building Request Fields.
-		$dataArray = array(
+		$data_array = array(
 			'access_key' => $this->get_access_key(),
 			'profile_id' => $this->get_profile_id(),
 			'transaction_uuid' => $order->order_key,
@@ -271,12 +268,14 @@ class WC_Gateway_Cybersource_Secure_Acceptance_SOP extends WC_Payment_Gateway {
 			'bill_to_address_country' => $order->billing_country,
 			'bill_to_address_postal_code' => $order->billing_postcode,
 			'bill_to_company_name' => $order->billing_company,
+			'customer_ip_address' => $this->get_ip_address(),
+			'device_fingerprint_id' => $this->device_finger_print( $order_id ),
 		);
 
 		$new = array();
 
-		// Loop through the Array and check if the Key => value exists
-		foreach ( $dataArray as $name => $value)
+		// Loop through array to check if the Key pair value is not empty, if empty exclude before siging the fields
+		foreach ( $data_array as $name => $value)
 		{ 
 			if( !$value == '' )
 			{
@@ -284,21 +283,22 @@ class WC_Gateway_Cybersource_Secure_Acceptance_SOP extends WC_Payment_Gateway {
 			}
 		}
 
-		// Create comma separated list from array
+		// Create comma separated list from array. The list will be created based on the Device Finger Print Status
 		$signed_field_names = "signed_field_names,";
 		$signed_field_names .= implode( ',', $new );
 
+
 		// Add the signed_field_names field to the Array to aid generate a HASH_MAC(Signature) value
-		$datatomerge = array_merge( $dataArray, array( "signed_field_names" => $signed_field_names ) );
+		$data_to_merge = array_merge( $data_array, array( "signed_field_names" => $signed_field_names ) );
 
 		// Pass the Data to Security.php to generate Signature 
-		foreach( $datatomerge as $name => $value )
+		foreach( $data_to_merge as $name => $value )
 		{
 			$params[ $name ] = $value;
 		}
 
 		// Add Signature field to the array before POSTing to CyberSource
-		$datatopost = array_merge( $datatomerge, array( "signature" => sign( $params ) ) );
+		$data_to_post = array_merge( $data_to_merge, array( "signature" => sign( $params ) ) );
 
 		// Get the order
 		$order = wc_get_order( $order_id );
@@ -311,32 +311,25 @@ class WC_Gateway_Cybersource_Secure_Acceptance_SOP extends WC_Payment_Gateway {
 		}
 		
 		/**
-		 * Build form name value pairs from Checkout page. This form is submitted to self in order to sign the form fields
-		 * before finally posting to CyberSource. The signature generated directly from this form is different from the name
-		 * value pairs looped through the $_REQUEST function as opposed to doing it right away from the dataArray.
-		 *
-		 * TODO: This form is automatically submitted with an onLoad Event.
+		 * Build form name value pairs from Checkout page.
+		 * 
+		 * This is were we submit the form fileds to CyberSource as per CyberSource API
 		 */
 ?>
 	<form action="<?php echo $this->get_action_url(); ?>" method="POST" class="checkout_cybersource_sop" >
 
 <?php
-		
-			foreach( $datatopost as $name => $value )
+			// Iterate and list the fields to post to CyberSource Endpoint url
+			foreach( $data_to_post as $name => $value )
 			{
 				echo "<input type=\"hidden\" id=\"" . $name . "\" name=\"" . $name . "\" value=\"" . $value . "\"/>\n";
 			}
 
+			// Unsigned field names not part of the $data_to_post array
 			echo "<input type=\"hidden\" id=\"card_expiry_date\" name=\"card_expiry_date\"/>\n";
 			echo "<input type=\"hidden\" id=\"card_number\" name=\"card_number\"/>\n";
 			echo "<input type=\"hidden\" id=\"card_cvn\" name=\"card_cvn\"/>\n";
 			echo "<input type=\"hidden\" id=\"card_type\" name=\"card_type\"/>\n";
-
-			/**
-			 * The fields will only be part of the form if Device Finger Print
-			 * has been enabled in the Admin Settings for this Plug-in in WooCommerce.
-			 */
-			echo $this->device_finger_print( $order_id );
 ?>
 		
 		<div id="payment">
@@ -375,7 +368,7 @@ class WC_Gateway_Cybersource_Secure_Acceptance_SOP extends WC_Payment_Gateway {
 				</select>
 				<select id="card_expiry_year" style="width:auto;">
 					<option value=""><?php _e( 'Year', 'wc_elavon' ) ?></option>
-					<?php foreach ( range( date( 'Y' ), date( 'Y' ) + 6 ) as $year ) : ?>
+					<?php foreach ( range( date( 'Y' ), date( 'Y' ) + 10 ) as $year ) : ?>
 						<option value="<?php echo $year ?>"><?php echo $year ?></option>
 					<?php endforeach; ?>
 				</select>
@@ -401,16 +394,19 @@ class WC_Gateway_Cybersource_Secure_Acceptance_SOP extends WC_Payment_Gateway {
 		jQuery(document).ready(function($)
 		{
 
-			/*
-			 * Checks if the client browser accepts cookies or not then sets the
-			 * value accordingly to be used by Decision Manager Device Finger Print
-			 */
-			if($.cookie())
+		<?php
+			/**
+			* To successfully implement Device Fingerprinting, an invisible 1-pixel image file and two
+			* scripts need to be placed in the <body> tag of the checkout page (the page prior to directing
+			* the customer to Secure Acceptance) at the top of the main body. This ensures a 3-5 second
+			* window in which the code segments can complete the data collection necessary to create a
+			* fingerprint for the device making the order.
+			*/
+			if ( $this->is_device_finger_print_enabled() )
 			{
-				$('#customer_cookies_accepted').val('true');
-			}else{
-				$('#customer_cookies_accepted').val('false');
+				echo $this->html_device_finger_print( $order_id );
 			}
+		?>
 
 			$('form.checkout_cybersource_sop').submit(function()
 			{
@@ -513,15 +509,14 @@ class WC_Gateway_Cybersource_Secure_Acceptance_SOP extends WC_Payment_Gateway {
 						width:           "50%"
 					}
 				});
-
-				// get rid of any space/dash characters
-				$('#card_accountNumber').val(accountNumber);
 				
 				// Concatenate the month and year (mm-yyyy) as it is the format that CyberSource expects
-				$('#card_expiry_date').val($('#card_expiry_month').val() + '-' + $('#card_expiry_year').val());
-				$('#card_number').val( $('#card_number1').val() );
-				$('#card_cvn').val( $('#card_cvn1').val() );
-				$('#card_type').val( $('#card_type1').val() );
+				$('#card_expiry_date').val( expirationMonth + '-' + expirationYear );
+				
+				// get rid of any space/dash characters
+				$('#card_number').val( accountNumber );
+				$('#card_cvn').val( cvNumber );
+				$('#card_type').val( cardType );
 
 			}); // End Submit Function
 
@@ -536,13 +531,6 @@ class WC_Gateway_Cybersource_Secure_Acceptance_SOP extends WC_Payment_Gateway {
 
 				return accountNumber.substr( ix - 1 ) == ( ( 10 - sum % 10 ) % 10 );
 			}
-
-			// Get Client GEO location
-			$.get("http://ipinfo.io", function(response)
-			{
-				$('#merchant_defined_data1').val(response.country);
-			},"jsonp");
-
 
 		});
 	</script>
@@ -819,7 +807,7 @@ class WC_Gateway_Cybersource_Secure_Acceptance_SOP extends WC_Payment_Gateway {
 	{
 
 		// proper configuration
-		if ( ! $this->get_profile_id() || ! $this->get_access_key() || ! $this->get_secret_key() ) return false;
+		if ( ! $this->get_profile_id() || ! $this->get_access_key() || ! $this->get_secret_key() || ! $this->get_merchant_id() ) return false;
 
 		return parent::is_available();
 	}
@@ -864,6 +852,9 @@ class WC_Gateway_Cybersource_Secure_Acceptance_SOP extends WC_Payment_Gateway {
 	}
 
 
+	/** Getter methods ******************************************************/
+
+
 	// Safely get post data if set
 	private function get_post( $name )
 	{
@@ -898,9 +889,6 @@ class WC_Gateway_Cybersource_Secure_Acceptance_SOP extends WC_Payment_Gateway {
 		// URL for the payment page
 		return add_query_arg( array( 'order-pay' => $order->id, 'key' => $order->order_key ), $payment_page );
 	}
-
-
-	/** Getter methods ******************************************************/
 
 
 	/**
@@ -948,13 +936,35 @@ class WC_Gateway_Cybersource_Secure_Acceptance_SOP extends WC_Payment_Gateway {
 
 
 	/**
-	 * Return the environment for the current mode
+	 * Return the Org ID for the current mode
 	 *
-	 * @return string Environment
+	 * @return string org_id
 	 */
-	public function get_environment()
+	public function get_org_id()
 	{
-		return $this->is_test_mode() ? $this->test_environment : $this->live_environment;
+		return $this->is_test_mode() ? $this->test_org_id : $this->live_org_id;
+	}
+
+
+	/**
+	 * Return the Merchant ID
+	 *
+	 * @return string merchant_id
+	 */
+	public function get_merchant_id()
+	{
+		return $this->merchant_id;
+	}
+
+
+	// Get Client GEO location
+	private function get_ip_address()
+	{
+		$url = "http://ipinfo.io/";
+		$json = file_get_contents($url);
+		$data = json_decode($json);
+		
+		return $data->ip;
 	}
 
 
@@ -1028,17 +1038,39 @@ class WC_Gateway_Cybersource_Secure_Acceptance_SOP extends WC_Payment_Gateway {
 	 * The fields will only be part of the form if Device Finger Print
 	 * has been enabled in the Admin Settings for this Plugin in WooCommerce.
 	 */
-	function device_finger_print( $order_id )
-	{
+	private function device_finger_print( $order_id )
+	{	
 		if( $this->is_device_finger_print_enabled() )
 		{
 			global $woocommerce, $wc_cybersource_secure_acceptance_sop;
 			$order = wc_get_order( $order_id );
-			echo "<input type=\"hidden\" id=\"customer_cookies_accepted\" name=\"customer_cookies_accepted\" />\n";
-			echo "<input type=\"hidden\" id=\"customer_ip_address\" name=\"customer_ip_address\" value=\"" . $_SERVER['REMOTE_ADDR'] . "\" />\n";
-			echo "<input type=\"hidden\" id=\"merchant_defined_data1\" name=\"merchant_defined_data1\" />\n";
-			echo "<input type=\"hidden\" id=\"device_fingerprint_id\" name=\"device_fingerprint_id\" value=\"" . $order->id . substr( $order->order_key,8 ) . "\" />\n";
+			return $order->id . substr( $order->order_key,9 );
 		}
+	}
+
+
+	// Return Device Fingerprinting code segments
+	private function html_device_finger_print( $order_id )
+	{
+		$js_html  =			'var org_ID = \'' . $this->get_org_id() . '\';';
+		$js_html .=			'var session_ID = \'' . $this->device_finger_print( $order_id ) . '\';';
+		$js_html .=			'var merchant_ID = \'' . $this->get_merchant_id() . '\';';
+
+		$js_html .=			'function device_finger_print()';
+		$js_html .=			'{';
+		
+		// The code segments for implementing Device Fingerprinting i.e. PNG Image, Flash Code and JavaScript Code respectively
+		$js_html .=				'var str_img = \'<p style="background:url(https://h.online-metrix.net/fp/clear.png?org_id=\' + org_ID + \'&amp;session_id=\' + merchant_ID + session_ID + \'&amp;m=1)"></p><img src="https://h.online-metrix.net/fp/clear.png?org_id=\' + org_ID + \'&amp;session_id=\' + merchant_ID + session_ID + \'&amp;m=2" alt="">\';';
+		$js_html .=				'var str_obj = \'<object type="application/x-shockwave-flash" data="https://h.online-metrix.net/fp/fp.swf?org_id=\' + org_ID + \'&amp;session_id=\' + merchant_ID + session_ID + \'" width="1" height="1" id="thm_fp"><param name="movie" value="https://h.online-metrix.net/fp/fp.swf?org_id=\' + org_ID + \'&amp;session_id=\' + merchant_ID + session_ID + \'" /><div></div></object>\';';
+		$js_html .=				'var str_script = \'<script src="https://h.online-metrix.net/fp/check.js?org_id=\' + org_ID + \'&amp;session_id=\' + merchant_ID + session_ID + \'" type="text/javascript">\';';
+
+		$js_html .=				'return str_img + str_obj + str_script ;';
+
+		$js_html .=			'}'; //End of device_finger_print function
+
+		$js_html .=			'$("body").prepend( device_finger_print() )'; // Prepend Device Fingerprinting code segments to body tag
+
+		return $js_html;
 	}
 
 
@@ -1048,7 +1080,7 @@ class WC_Gateway_Cybersource_Secure_Acceptance_SOP extends WC_Payment_Gateway {
 	 * unfortunately the later gives a blank action url and the former redirects to 
 	 * the WordPress Index.php page as it is used as the entry point to the site.
 	 */
-	private function selfURL()
+	private function self_URL()
 	{
 		$ret = substr( strtolower($_SERVER['SERVER_PROTOCOL']),0,strpos( strtolower($_SERVER['SERVER_PROTOCOL']),"/")); // Add protocol (like HTTP)
 		$ret .= ( empty($_SERVER['HTTPS']) ? NULL : (($_SERVER['HTTPS'] == "on") ? "s" : NULL )); // Add 's' if protocol is secure HTTPS
@@ -1057,6 +1089,88 @@ class WC_Gateway_Cybersource_Secure_Acceptance_SOP extends WC_Payment_Gateway {
 		$ret .= $_SERVER['REQUEST_URI']; // Add the rest of the URL
 		
 		return $ret; // Return the value
+	}
+
+
+	/**
+	 * autocompleteOrders 
+	 * Autocomplete Orders
+	 * @return void
+	 */
+	function autocompleteOrders()
+	{
+		$mode = get_option('wc_'.$this->id.'_mode');
+		if ($mode == 'all')
+		{
+			add_action('woocommerce_thankyou', 'autocompleteAllOrders');
+			/**
+			 * autocompleteAllOrders 
+			 * Register custom tabs Post Type
+			 * @return void
+			 */
+			function autocompleteAllOrders($order_id)
+			{
+				global $woocommerce;
+
+				if (!$order_id)
+					return;
+				$order = new WC_Order($order_id);
+				$order->update_status('completed');
+			}
+		} elseif ($mode == 'paid') {
+			add_filter('woocommerce_payment_complete_order_status', 'autocompletePaidOrders', 10, 2);
+			/**
+			 * autocompletePaidOrders 
+			 * Register custom tabs Post Type
+			 * @return void
+			 */
+			function autocompletePaidOrders($order_status, $order_id)
+			{
+				$order = new WC_Order($order_id);
+				if ($order_status == 'processing' && ($order->status == 'on-hold' || $order->status == 'pending' || $order->status == 'failed')) 
+				{
+					return 'completed';
+				}
+				return $order_status;
+			}
+		} elseif ($mode == 'virtual') {
+			add_filter('woocommerce_payment_complete_order_status', 'autocompleteVirtualOrders', 10, 2);
+			/**
+			 * autocompleteVirtualOrders 
+			 * Register custom tabs Post Type
+			 * @return void
+			 */
+			function autocompleteVirtualOrders($order_status, $order_id)
+			{
+				$order = new WC_Order($order_id);
+				if ('processing' == $order_status && ('on-hold' == $order->status || 'pending' == $order->status || 'failed' == $order->status)) 
+				{
+					$virtual_order = null;
+					if (count($order->get_items()) > 0 ) 
+					{
+						foreach ($order->get_items() as $item) 
+						{
+							if ('line_item' == $item['type']) 
+							{
+								$_product = $order->get_product_from_item($item);
+								if (!$_product->is_virtual()) 
+								{
+									$virtual_order = false;
+									break;
+								} else {
+									$virtual_order = true;
+								}
+							}
+						}
+					}
+					if ($virtual_order) 
+					{
+						return 'completed';
+					}
+				}
+				return $order_status;
+			}
+		}
 	}
 
 

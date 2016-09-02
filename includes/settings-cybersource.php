@@ -1,8 +1,6 @@
 <?php
 
-if ( ! defined( 'ABSPATH' ) ) {
-	exit;
-}
+if ( ! defined( 'ABSPATH' ) ) exit; // Exit if accessed directly
 
 /**
  * Settings for CyberSource Secure Acceptance SOP Gateway
@@ -124,7 +122,7 @@ return array(
 		'desc_tip'      => true,
 	),
 	'currency' => array(
-		'title'       => __( 'Payment Currency Processing', WC_Cybersource_Secure_Acceptance_SOP::TEXT_DOMAIN ),
+		'title'       => __( 'Payment Processing Currency', WC_Cybersource_Secure_Acceptance_SOP::TEXT_DOMAIN ),
 		'type'        => 'select',
 		'description' => __( 'Currency used for the Order Payment. The Currency configured here should correspond with the currency that has been used with WooCommerce Products. Otherwise the payment will be processed with the currency that is associated with the Gateway e.g. if the Product is priced in USD then select USD here.', WC_Cybersource_Secure_Acceptance_SOP::TEXT_DOMAIN ),
 		'options'     => array( 'EUR' => __( 'Euro', WC_Cybersource_Secure_Acceptance_SOP::TEXT_DOMAIN ),
@@ -134,6 +132,19 @@ return array(
 								'ZMW' => __( 'Zambian Kwacha', WC_Cybersource_Secure_Acceptance_SOP::TEXT_DOMAIN )),
 		'default'     => 'ZMW',
 		'desc_tip'      => true,
+	),
+	'merchant_id' => array(
+		'title'       => __( 'Merchant ID', WC_Cybersource_Secure_Acceptance_SOP::TEXT_DOMAIN ),
+		'type'        => 'text',
+		'description' => __('Your CyberSource Merchant Id.  This is what your Acquirer provides with to log into the CyberSource Business Center.', WC_Cybersource_Secure_Acceptance_SOP::TEXT_DOMAIN ),
+		'default'     => '',
+		'desc_tip'      => true,
+	),
+	'profile_keys'	=> array(
+		'title'			=> __('CyberSource Profile Keys',WC_Cybersource_Secure_Acceptance_SOP::TEXT_DOMAIN ),
+		'type'			=> 'title',
+		'description'	=> 'Enter your Profile Keys from CyberSource Business Center.',
+		'desc_tip'		=> true,
 	),
 	'profile_id' => array(
 		'title'       => __( 'Profile ID', WC_Cybersource_Secure_Acceptance_SOP::TEXT_DOMAIN ),
@@ -176,5 +187,24 @@ return array(
 		'description' => __("The Access Key for your test account. Find this by logging into your <strong style='color: #FF0000'>TEST</strong> CyberSource Business Center account and go to Tools &amp; Settings &gt; Profiles &gt; &#40; Select &#41; Profile Name &gt; Security &gt; Create New Key &gt; Generate Key, if you have not already done so.", WC_Cybersource_Secure_Acceptance_SOP::TEXT_DOMAIN ),
 		'default'     => '',
 		'desc_tip'      => true,
+	),
+	'autocomplete_orders'	=> array(
+		'title'			=> __('Autocomplete Orders',WC_Cybersource_Secure_Acceptance_SOP::TEXT_DOMAIN ),
+		'type'			=> 'title',
+		'description'	=> 'Activate the mode by selecting the option that suits your needs',
+		'desc_tip'		=> true,
+	),
+	'autocomplete_orders_mode' => array(
+		'title'     => __('Mode', WC_Cybersource_Secure_Acceptance_SOP::TEXT_DOMAIN ),
+		'type'     => 'select',
+		'description'     => __('Select the modality you want to activate.', WC_Cybersource_Secure_Acceptance_SOP::TEXT_DOMAIN ),
+		'desc_tip' => true,
+		'default'  => 'off',
+		'options' => array(
+			'off'     => 'Off',
+			'virtual' => 'Paid orders of virtual products only',
+			'paid'    => 'All paid orders of any product',
+			'all'     => 'Any order (irrespective of the payment status)'
+		)
 	),
 );

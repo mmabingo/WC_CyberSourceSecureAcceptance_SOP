@@ -22,3 +22,16 @@ To configure CyberSource:
  * Ensure that the supported Credit\Debit Cards are added to the Payment Method list that you selected in the WooCommerce plugin settings are also listed.
  * Under 'Customer Response Pages' set the 'Hosted by you URL' to https://www.example.com/?wc-api=wc_gateway_cybersource_secure_acceptance_sop_response where www.example.com is the host name of your server
  * Click 'Save' at the top\bottom of the page.
+
+ == Testing ==
+ 
+ For test transactions:
+ 
+ * Card Type/Number:
+ * Visa				/ 4000000000000002
+ * MasterCard		/ 5555555555554444
+ * Maestro Int'l	/ 6000340000009859
+ * American Express	/ 378282246310005
+ *
+ * Expiration Date: any date in the future
+ * Card Security Code: any 3 digits

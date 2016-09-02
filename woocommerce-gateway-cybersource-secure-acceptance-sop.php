@@ -1,12 +1,12 @@
 <?php
 
 /**
- * Plugin Name: WooCommerce CyberSource Secure Acceptance SOP Gateway
+ * Plugin Name: WooCommerce CyberSource Secure Acceptance SOP Gateway - Developement
  * Plugin URI: 
  * Description: Adds the CyberSource Secure Acceptance Silent Order Post (SOP) payment gateway to your WooCommerce website. Requires an SSL certificate.
  * Author: Mikochi Mabingo
  * Author URI: 
- * Version: 1.1.0
+ * Version: 1.2.0-beta
  * License: GNU General Public License v3.0
  * License URI: http://www.gnu.org/licenses/gpl-3.0.html
  */
@@ -32,8 +32,8 @@ $GLOBALS['wc_cybersource_secure_acceptance_sop'] = new WC_Cybersource_Secure_Acc
  * Maestro Int'l	/ 6000340000009859
  * American Express	/ 378282246310005
  *
- * Expiration Date: in the future
- * Card Security Code: ignored
+ * Expiration Date: any date in the future
+ * Card Security Code: any 3 digits
  */
 class WC_Cybersource_Secure_Acceptance_SOP
 {
@@ -94,12 +94,14 @@ class WC_Cybersource_Secure_Acceptance_SOP
 		// Unhook Woocommerce email notifications
 		add_action( 'woocommerce_email', array( $this, 'unhook_email_notifications' ) );
 
-		// Technically this is cheating, we're going to set up our own API
-		// listeners and instantiate and hand off to the payment gateway
-		// object when really we should be listening from within the gateway
-		// on a single response URL based on its classname.  However, recoding
-		// these handlers would be more effort than this gateway can justify
-		// with its current sales figures
+		/**
+		* Technically this is cheating, we're going to set up our own API
+		* listeners and instantiate and hand off to the payment gateway
+		* object when really we should be listening from within the gateway
+		* on a single response URL based on its classname.  However, recoding
+		* these handlers would be more effort than this gateway can justify
+		* with its current sales figures
+		*/
 		$this->response_url = add_query_arg( 'wc-api', 'wc_gateway_cybersource_secure_acceptance_sop_response', home_url( '/' ) );
 
 		if ( is_ssl() || 'yes' == get_option( 'woocommerce_force_ssl_checkout' ) )
@@ -219,7 +221,7 @@ class WC_Cybersource_Secure_Acceptance_SOP
 		if ( ! is_object( $this->logger ) )
 		{
 
-				$this->logger = new WC_Logger();
+			$this->logger = new WC_Logger();
 
 			$this->logger->add( self::GATEWAY_ID, $message );
 		}
